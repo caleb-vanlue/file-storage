@@ -10,6 +10,7 @@ import { v4 as uuidv4 } from 'uuid';
 
 const mkdirAsync = promisify(fs.mkdir);
 const existsAsync = promisify(fs.exists);
+const unlinkAsync = promisify(fs.unlink);
 
 @Injectable()
 export class FileStorageService {
@@ -75,6 +76,18 @@ export class FileStorageService {
     storedFile.referenceId = referenceId ? referenceId : undefined;
 
     return this.fileRepository.save(storedFile);
+  }
+
+  async deleteFile(id: string): Promise<void> {
+    const file = await this.getFileById(id);
+
+    const filePath = this.getFilePath(file);
+    if (await existsAsync(filePath)) {
+      await unlinkAsync(filePath);
+    }
+
+    await this.fileRepository.remove(file);
+    this.logger.log(`Deleted file: ${file.filename} (ID: ${file.id})`);
   }
 
   async getFileById(id: string): Promise<StoredFile> {

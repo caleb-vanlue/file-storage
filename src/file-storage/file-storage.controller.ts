@@ -50,11 +50,41 @@ export class FileStorageController {
         originalName: storedFile.originalName,
         mimeType: storedFile.mimeType,
         size: storedFile.size,
-        url: `/files/${storedFile.filename}`,
+        url: `/files/${storedFile.id}`,
       };
     } catch (error) {
       this.logger.error(`Error uploading file: ${error.message}`);
       throw new BadRequestException(`Error uploading file: ${error.message}`);
+    }
+  }
+
+  @Get('id/:id')
+  async getFileById(@Param('id') id: string, @Res() res: Response) {
+    try {
+      const file = await this.fileStorageService.getFileById(id);
+      const filePath = this.fileStorageService.getFilePath(file);
+
+      if (!existsSync(filePath)) {
+        throw new NotFoundException(`File not found on disk: ${id}`);
+      }
+
+      res.set({
+        'Content-Type': file.mimeType,
+        'Content-Disposition': `inline; filename="${file.originalName}"`,
+      });
+
+      const fileStream = createReadStream(filePath);
+      fileStream.pipe(res);
+    } catch (error) {
+      this.logger.error(`Error retrieving file by ID: ${error.message}`);
+
+      if (error instanceof NotFoundException) {
+        return res.status(404).send({ error: 'File not found' });
+      } else {
+        return res
+          .status(500)
+          .send({ error: `Failed to retrieve file: ${error.message}` });
+      }
     }
   }
 
@@ -88,6 +118,32 @@ export class FileStorageController {
     }
   }
 
+  @Get('info/id/:id')
+  async getFileInfoById(@Param('id') id: string) {
+    try {
+      const file = await this.fileStorageService.getFileById(id);
+      return {
+        id: file.id,
+        filename: file.filename,
+        originalName: file.originalName,
+        mimeType: file.mimeType,
+        size: file.size,
+        createdAt: file.createdAt,
+        url: `/files/id/${file.id}`,
+      };
+    } catch (error) {
+      this.logger.error(`Error retrieving file info by ID: ${error.message}`);
+
+      if (error instanceof NotFoundException) {
+        throw new NotFoundException(`File not found: ${id}`);
+      } else {
+        throw new BadRequestException(
+          `Error retrieving file info: ${error.message}`,
+        );
+      }
+    }
+  }
+
   @Get('info/:filename')
   async getFileInfo(@Param('filename') filename: string) {
     try {
@@ -99,7 +155,7 @@ export class FileStorageController {
         mimeType: file.mimeType,
         size: file.size,
         createdAt: file.createdAt,
-        url: `/files/${file.filename}`,
+        url: `/files/id/${file.id}`,
       };
     } catch (error) {
       this.logger.error(`Error retrieving file info: ${error.message}`);
@@ -110,6 +166,22 @@ export class FileStorageController {
         throw new BadRequestException(
           `Error retrieving file info: ${error.message}`,
         );
+      }
+    }
+  }
+
+  @Delete(':id')
+  async deleteFile(@Param('id') id: string) {
+    try {
+      await this.fileStorageService.deleteFile(id);
+      return { success: true, message: 'File deleted successfully' };
+    } catch (error) {
+      this.logger.error(`Error deleting file: ${error.message}`);
+
+      if (error instanceof NotFoundException) {
+        throw new NotFoundException(`File not found: ${id}`);
+      } else {
+        throw new BadRequestException(`Error deleting file: ${error.message}`);
       }
     }
   }
