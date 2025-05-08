@@ -1,6 +1,6 @@
 import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, FindOptionsWhere } from 'typeorm';
+import { Repository, FindOptionsWhere, Brackets } from 'typeorm';
 import { StoredFile } from './entities/stored-file.entity';
 import { ConfigService } from '@nestjs/config';
 import * as fs from 'fs';
@@ -129,16 +129,29 @@ export class FileStorageService {
     }
 
     try {
-      const whereClause = query.plexMediaType
-        ? [{ ...whereConditions }, { plexMediaType: query.plexMediaType }]
-        : [{ ...whereConditions }];
-
-      const thumbnail = await this.fileRepository.findOne({
-        where: whereClause,
-        order: {
-          createdAt: 'DESC',
-        },
-      });
+      const thumbnail = await this.fileRepository
+        .createQueryBuilder('StoredFile')
+        .where(
+          new Brackets((qb) => {
+            qb.where('StoredFile.plexRatingKey = :plexRatingKey', {
+              plexRatingKey: query.plexRatingKey,
+            })
+              .orWhere(
+                'StoredFile.plexParentRatingKey = :plexParentRatingKey',
+                { plexParentRatingKey: query.plexParentRatingKey },
+              )
+              .orWhere(
+                'StoredFile.plexGrandparentRatingKey = :plexGrandparentRatingKey',
+                { plexGrandparentRatingKey: query.plexGrandparentRatingKey },
+              );
+          }),
+        )
+        .andWhere('StoredFile.plexMediaType = :plexMediaType', {
+          plexMediaType: 'track',
+        })
+        .orderBy('StoredFile.createdAt', 'DESC')
+        .limit(1)
+        .getOne();
 
       if (thumbnail) {
         this.logger.debug(`Found thumbnail: ${thumbnail.id} for query`);
