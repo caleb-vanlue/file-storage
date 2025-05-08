@@ -1,0 +1,32 @@
+version: '3.8'
+
+services:
+  file-storage:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: file-storage
+    ports:
+      - '3001:3001'
+    networks:
+      - app-network
+    environment:
+      - DB_HOST=${DB_HOST:-host.docker.internal}
+      - DB_PORT=${DB_PORT:-5432}
+      - DB_USERNAME=${DB_USERNAME}
+      - DB_PASSWORD=${DB_PASSWORD}
+      - DB_DATABASE=${DB_DATABASE}
+      - NODE_ENV=${NODE_ENV:-production}
+      - PORT=${PORT:-3001}
+      - FILE_STORAGE_PATH=${FILE_STORAGE_PATH:-/app/storage}
+    volumes:
+      - '${STORAGE_VOLUME_PATH:-Y:/FileStorage}:/app/storage'
+    restart: unless-stopped
+    extra_hosts:
+      - 'host.docker.internal:host-gateway'
+    command: npm run start:prod
+
+networks:
+  app-network:
+    name: app-network
+    driver: bridge
