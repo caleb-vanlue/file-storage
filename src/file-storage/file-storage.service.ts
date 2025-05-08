@@ -113,36 +113,14 @@ export class FileStorageService {
 
     const whereConditions: FindOptionsWhere<StoredFile> = {};
 
-    if (query.plexMediaType) {
-      whereConditions.plexMediaType = query.plexMediaType;
-    }
-
-    if (query.plexMediaType === 'movie' && query.plexRatingKey) {
+    if (query.plexRatingKey) {
       whereConditions.plexRatingKey = query.plexRatingKey;
-    } else if (query.plexMediaType === 'track' && query.plexParentRatingKey) {
+    }
+    if (query.plexParentRatingKey) {
       whereConditions.plexParentRatingKey = query.plexParentRatingKey;
-    } else if (
-      query.plexMediaType === 'episode' &&
-      query.plexGrandparentRatingKey
-    ) {
+    }
+    if (query.plexGrandparentRatingKey) {
       whereConditions.plexGrandparentRatingKey = query.plexGrandparentRatingKey;
-    } else if (query.plexMediaType === 'episode' && query.plexParentRatingKey) {
-      whereConditions.plexParentRatingKey = query.plexParentRatingKey;
-    } else {
-      if (query.plexRatingKey) {
-        whereConditions.plexRatingKey = query.plexRatingKey;
-      }
-      if (query.plexParentRatingKey && !whereConditions.plexRatingKey) {
-        whereConditions.plexParentRatingKey = query.plexParentRatingKey;
-      }
-      if (
-        query.plexGrandparentRatingKey &&
-        !whereConditions.plexParentRatingKey &&
-        !whereConditions.plexRatingKey
-      ) {
-        whereConditions.plexGrandparentRatingKey =
-          query.plexGrandparentRatingKey;
-      }
     }
 
     if (Object.keys(whereConditions).length <= 1 && query.plexMediaType) {
@@ -151,10 +129,12 @@ export class FileStorageService {
     }
 
     try {
+      const whereClause = query.plexMediaType
+        ? [{ ...whereConditions }, { plexMediaType: query.plexMediaType }]
+        : [{ ...whereConditions }];
+
       const thumbnail = await this.fileRepository.findOne({
-        where: Object.entries(whereConditions).map(([key, value]) => ({
-          [key]: value,
-        })),
+        where: whereClause,
         order: {
           createdAt: 'DESC',
         },

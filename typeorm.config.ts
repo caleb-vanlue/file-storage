@@ -13,6 +13,7 @@ export const getDataSourceOptions = (): DataSourceOptions => ({
   database: process.env.DB_DATABASE || 'file_storage',
   entities: [StoredFile],
   migrations: ['dist/migrations/*.js'],
+  logging: true,
 });
 
 const dataSource = new DataSource(getDataSourceOptions());
