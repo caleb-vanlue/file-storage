@@ -14,7 +14,7 @@ A robust NestJS-based file storage service for managing file uploads, retrieval,
 ## Prerequisites
 
 - Node.js (v16+)
-- PostgreSQL
+- PostgreSQL and a newly created database matching the name specified in the .env
 - TypeScript
 
 ## Environment Variables
