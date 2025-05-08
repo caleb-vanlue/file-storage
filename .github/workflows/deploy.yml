@@ -1,4 +1,4 @@
-name: deploy
+name: Deploy File Storage
 
 on:
   push:
@@ -27,17 +27,14 @@ jobs:
           DB_DATABASE: ${{ secrets.DB_DATABASE }}
           NODE_ENV: production
         run: |
-          $imageId = docker-compose images -q file-storage
-
-          docker run --rm `
+          docker-compose run --rm `
             -e DB_HOST=$env:DB_HOST `
             -e DB_PORT=$env:DB_PORT `
             -e DB_USERNAME=$env:DB_USERNAME `
             -e DB_PASSWORD=$env:DB_PASSWORD `
             -e DB_DATABASE=$env:DB_DATABASE `
             -e NODE_ENV=$env:NODE_ENV `
-            --add-host=host.docker.internal:host-gateway `
-            $imageId `
+            file-storage `
             npm run migration:run
 
       - name: Deploy services
@@ -62,19 +59,7 @@ jobs:
             Write-Host "Container doesn't exist, continuing..."
           }
 
-          $env:COMPOSE_DOCKER_CLI_BUILD = 0
-
-          docker-compose up -d --no-deps `
-            -e DB_HOST `
-            -e DB_PORT `
-            -e DB_USERNAME `
-            -e DB_PASSWORD `
-            -e DB_DATABASE `
-            -e STORAGE_VOLUME_PATH `
-            -e FILE_STORAGE_PATH `
-            -e NODE_ENV `
-            -e PORT `
-            file-storage
+          docker-compose up -d file-storage
 
           docker-compose ps
 
