@@ -1,4 +1,4 @@
-name: Deploy
+name: Deploy File Storage
 
 on:
   push:
@@ -12,63 +12,68 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v3
 
-      - name: Build Docker image
-        shell: powershell
-        run: |
-          docker build -t file-storage:latest .
-
-      - name: Create environment file
+      - name: Run database migrations
         shell: powershell
         env:
-          DB_HOST: 'host.docker.internal'
-          DB_PORT: '5432'
+          DB_HOST: host.docker.internal
+          DB_PORT: 5432
           DB_USERNAME: ${{ secrets.DB_USERNAME }}
           DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
           DB_DATABASE: ${{ secrets.DB_DATABASE }}
-          FILE_STORAGE_PATH: '/app/storage'
+          NODE_ENV: production
         run: |
-          @"
-          DB_HOST=${env:DB_HOST}
-          DB_PORT=${env:DB_PORT}
-          DB_USERNAME=${env:DB_USERNAME}
-          DB_PASSWORD=${env:DB_PASSWORD}
-          DB_DATABASE=${env:DB_DATABASE}
-          NODE_ENV=production
-          PORT=3001
-          FILE_STORAGE_PATH=${env:FILE_STORAGE_PATH}
-          "@ | Out-File -FilePath .env -Encoding utf8
-
-      - name: Run database migrations
-        shell: powershell
-        run: |
+          # Set environment variables for the command but don't write them to a file
           docker run --rm `
-            --env-file .env `
-            file-storage:latest `
+            -e DB_HOST=$env:DB_HOST `
+            -e DB_PORT=$env:DB_PORT `
+            -e DB_USERNAME=$env:DB_USERNAME `
+            -e DB_PASSWORD=$env:DB_PASSWORD `
+            -e DB_DATABASE=$env:DB_DATABASE `
+            -e NODE_ENV=$env:NODE_ENV `
+            --add-host=host.docker.internal:host-gateway `
+            $(docker-compose build -q file-storage && docker-compose images -q file-storage) `
             npm run migration:run
 
-      - name: Deploy file storage container
+      - name: Deploy services
         shell: powershell
+        env:
+          DB_HOST: host.docker.internal
+          DB_PORT: 5432
+          DB_USERNAME: ${{ secrets.DB_USERNAME }}
+          DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
+          DB_DATABASE: ${{ secrets.DB_DATABASE }}
+          STORAGE_VOLUME_PATH: 'Y:/FileStorage'
+          FILE_STORAGE_PATH: '/app/storage'
+          NODE_ENV: production
+          PORT: 3001
         run: |
+          docker-compose build file-storage
+
           $containerExists = docker ps -a --filter "name=file-storage" --format "{{.Names}}"
           if ($containerExists) {
             Write-Host "Stopping existing container"
-            docker stop file-storage
-            docker rm file-storage
+            docker-compose stop file-storage
+            docker-compose rm -f file-storage
           } else {
             Write-Host "Container doesn't exist, continuing..."
           }
 
-          docker run -d `
-            --name file-storage `
-            -p 3001:3001 `
-            --env-file .env `
-            --add-host=host.docker.internal:host-gateway `
-            --restart unless-stopped `
-            -v "Y:/FileStorage:/app/storage" `
-            file-storage:latest `
-            npm run start:prod
+          docker-compose up -d `
+            --no-deps `
+            -e DB_HOST=$env:DB_HOST `
+            -e DB_PORT=$env:DB_PORT `
+            -e DB_USERNAME=$env:DB_USERNAME `
+            -e DB_PASSWORD=$env:DB_PASSWORD `
+            -e DB_DATABASE=$env:DB_DATABASE `
+            -e STORAGE_VOLUME_PATH=$env:STORAGE_VOLUME_PATH `
+            -e FILE_STORAGE_PATH=$env:FILE_STORAGE_PATH `
+            -e NODE_ENV=$env:NODE_ENV `
+            -e PORT=$env:PORT `
+            file-storage
 
-          docker ps -a
+          docker-compose ps
 
+      - name: Cleanup
+        shell: powershell
+        run: |
           docker image prune -f
-          Remove-Item .env
