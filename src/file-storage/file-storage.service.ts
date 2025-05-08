@@ -1,6 +1,6 @@
 import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { Repository, FindOptionsWhere } from 'typeorm';
 import { StoredFile } from './entities/stored-file.entity';
 import { ConfigService } from '@nestjs/config';
 import * as fs from 'fs';
@@ -11,6 +11,25 @@ import { v4 as uuidv4 } from 'uuid';
 const mkdirAsync = promisify(fs.mkdir);
 const existsAsync = promisify(fs.exists);
 const unlinkAsync = promisify(fs.unlink);
+
+interface StoreFileOptions {
+  isPublic?: boolean;
+  referenceType?: string;
+  referenceId?: string;
+  // Plex-specific metadata
+  plexMediaType?: string;
+  plexRatingKey?: string;
+  plexParentRatingKey?: string;
+  plexGrandparentRatingKey?: string;
+  plexTitle?: string;
+}
+
+interface PlexThumbnailQuery {
+  plexMediaType?: string;
+  plexRatingKey?: string;
+  plexParentRatingKey?: string;
+  plexGrandparentRatingKey?: string;
+}
 
 @Injectable()
 export class FileStorageService {
@@ -41,16 +60,17 @@ export class FileStorageService {
 
   async storeFile(
     file: Express.Multer.File,
-    options: {
-      isPublic?: boolean;
-      referenceType?: string;
-      referenceId?: string;
-    } = {},
+    options: StoreFileOptions = {},
   ): Promise<StoredFile> {
     const {
       isPublic = false,
       referenceType = null,
       referenceId = null,
+      plexMediaType = null,
+      plexRatingKey = null,
+      plexParentRatingKey = null,
+      plexGrandparentRatingKey = null,
+      plexTitle = null,
     } = options;
 
     const fileExtension = path.extname(file.originalname);
@@ -72,10 +92,83 @@ export class FileStorageService {
     storedFile.path = relativePath;
     storedFile.size = file.size;
     storedFile.isPublic = isPublic;
-    storedFile.referenceType = referenceType ? referenceType : undefined;
-    storedFile.referenceId = referenceId ? referenceId : undefined;
+    storedFile.referenceType = referenceType || undefined;
+    storedFile.referenceId = referenceId || undefined;
+
+    storedFile.plexMediaType = plexMediaType || undefined;
+    storedFile.plexRatingKey = plexRatingKey || undefined;
+    storedFile.plexParentRatingKey = plexParentRatingKey || undefined;
+    storedFile.plexGrandparentRatingKey = plexGrandparentRatingKey || undefined;
+    storedFile.plexTitle = plexTitle || undefined;
 
     return this.fileRepository.save(storedFile);
+  }
+
+  async findPlexThumbnail(
+    query: PlexThumbnailQuery,
+  ): Promise<StoredFile | null> {
+    this.logger.debug(
+      `Finding Plex thumbnail with query: ${JSON.stringify(query)}`,
+    );
+
+    const whereConditions: FindOptionsWhere<StoredFile> = {};
+
+    if (query.plexMediaType) {
+      whereConditions.plexMediaType = query.plexMediaType;
+    }
+
+    if (query.plexMediaType === 'movie' && query.plexRatingKey) {
+      whereConditions.plexRatingKey = query.plexRatingKey;
+    } else if (query.plexMediaType === 'track' && query.plexParentRatingKey) {
+      whereConditions.plexParentRatingKey = query.plexParentRatingKey;
+    } else if (
+      query.plexMediaType === 'episode' &&
+      query.plexGrandparentRatingKey
+    ) {
+      whereConditions.plexGrandparentRatingKey = query.plexGrandparentRatingKey;
+    } else if (query.plexMediaType === 'episode' && query.plexParentRatingKey) {
+      whereConditions.plexParentRatingKey = query.plexParentRatingKey;
+    } else {
+      if (query.plexRatingKey) {
+        whereConditions.plexRatingKey = query.plexRatingKey;
+      }
+      if (query.plexParentRatingKey && !whereConditions.plexRatingKey) {
+        whereConditions.plexParentRatingKey = query.plexParentRatingKey;
+      }
+      if (
+        query.plexGrandparentRatingKey &&
+        !whereConditions.plexParentRatingKey &&
+        !whereConditions.plexRatingKey
+      ) {
+        whereConditions.plexGrandparentRatingKey =
+          query.plexGrandparentRatingKey;
+      }
+    }
+
+    if (Object.keys(whereConditions).length <= 1 && query.plexMediaType) {
+      this.logger.debug('Not enough specific conditions for thumbnail search');
+      return null;
+    }
+
+    try {
+      const thumbnail = await this.fileRepository.findOne({
+        where: whereConditions,
+        order: {
+          createdAt: 'DESC',
+        },
+      });
+
+      if (thumbnail) {
+        this.logger.debug(`Found thumbnail: ${thumbnail.id} for query`);
+      } else {
+        this.logger.debug('No matching thumbnail found');
+      }
+
+      return thumbnail || null;
+    } catch (error) {
+      this.logger.error(`Error finding Plex thumbnail: ${error.message}`);
+      return null;
+    }
   }
 
   async deleteFile(id: string): Promise<void> {

@@ -32,6 +32,11 @@ export class FileStorageController {
     @Body('referenceType') referenceType?: string,
     @Body('referenceId') referenceId?: string,
     @Body('isPublic') isPublic?: string,
+    @Body('plexMediaType') plexMediaType?: string,
+    @Body('plexRatingKey') plexRatingKey?: string,
+    @Body('plexParentRatingKey') plexParentRatingKey?: string,
+    @Body('plexGrandparentRatingKey') plexGrandparentRatingKey?: string,
+    @Body('plexTitle') plexTitle?: string,
   ) {
     if (!file) {
       throw new BadRequestException('No file uploaded');
@@ -42,6 +47,11 @@ export class FileStorageController {
         isPublic: isPublic === 'true',
         referenceType,
         referenceId,
+        plexMediaType,
+        plexRatingKey,
+        plexParentRatingKey,
+        plexGrandparentRatingKey,
+        plexTitle,
       });
 
       return {
@@ -50,11 +60,55 @@ export class FileStorageController {
         originalName: storedFile.originalName,
         mimeType: storedFile.mimeType,
         size: storedFile.size,
-        url: `/files/${storedFile.id}`,
+        url: `/files/id/${storedFile.id}`,
       };
     } catch (error) {
       this.logger.error(`Error uploading file: ${error.message}`);
       throw new BadRequestException(`Error uploading file: ${error.message}`);
+    }
+  }
+
+  @Get('plex/thumbnail')
+  async getPlexThumbnail(
+    @Query('mediaType') mediaType: string,
+    @Query('ratingKey') ratingKey?: string,
+    @Query('parentRatingKey') parentRatingKey?: string,
+    @Query('grandparentRatingKey') grandparentRatingKey?: string,
+  ) {
+    try {
+      if (!ratingKey && !parentRatingKey && !grandparentRatingKey) {
+        throw new BadRequestException('At least one rating key is required');
+      }
+
+      const thumbnail = await this.fileStorageService.findPlexThumbnail({
+        plexMediaType: mediaType,
+        plexRatingKey: ratingKey,
+        plexParentRatingKey: parentRatingKey,
+        plexGrandparentRatingKey: grandparentRatingKey,
+      });
+
+      if (!thumbnail) {
+        throw new NotFoundException('No matching thumbnail found');
+      }
+
+      return {
+        id: thumbnail.id,
+        filename: thumbnail.filename,
+        originalName: thumbnail.originalName,
+        mimeType: thumbnail.mimeType,
+        size: thumbnail.size,
+        url: `/files/id/${thumbnail.id}`,
+        plexMediaType: thumbnail.plexMediaType,
+        plexTitle: thumbnail.plexTitle,
+      };
+    } catch (error) {
+      if (error instanceof NotFoundException) {
+        throw error;
+      }
+      this.logger.error(`Error finding Plex thumbnail: ${error.message}`);
+      throw new BadRequestException(
+        `Error finding thumbnail: ${error.message}`,
+      );
     }
   }
 
