@@ -152,7 +152,9 @@ export class FileStorageService {
 
     try {
       const thumbnail = await this.fileRepository.findOne({
-        where: whereConditions,
+        where: Object.entries(whereConditions).map(([key, value]) => ({
+          [key]: value,
+        })),
         order: {
           createdAt: 'DESC',
         },
