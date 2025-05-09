@@ -9,7 +9,7 @@ services:
     ports:
       - '3001:3001'
     networks:
-      - app-network
+      - host-network
     environment:
       - DB_HOST=${DB_HOST:-host.docker.internal}
       - DB_PORT=${DB_PORT:-5432}
@@ -27,6 +27,7 @@ services:
     command: npm run start:prod
 
 networks:
-  app-network:
-    name: app-network
+  host-network:
+    name: host-network
     driver: bridge
+    external: false
