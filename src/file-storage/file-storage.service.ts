@@ -147,7 +147,7 @@ export class FileStorageService {
           }),
         )
         .andWhere('StoredFile.plexMediaType = :plexMediaType', {
-          plexMediaType: 'track',
+          plexMediaType: query.plexMediaType,
         })
         .orderBy('StoredFile.createdAt', 'DESC')
         .limit(1)
