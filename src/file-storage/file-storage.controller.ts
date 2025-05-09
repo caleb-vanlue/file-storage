@@ -18,7 +18,9 @@ import { Response } from 'express';
 import { FileStorageService } from './file-storage.service';
 import { createReadStream } from 'fs';
 import { existsSync } from 'fs';
+import { ApiParam, ApiQuery, ApiTags } from '@nestjs/swagger';
 
+@ApiTags('files')
 @Controller('files')
 export class FileStorageController {
   private readonly logger = new Logger(FileStorageController.name);
@@ -68,6 +70,30 @@ export class FileStorageController {
     }
   }
 
+  @ApiQuery({
+    name: 'mediaType',
+    required: true,
+    description: 'Type of Plex media (e.g., "movie", "episode", "track")',
+    type: String,
+  })
+  @ApiQuery({
+    name: 'ratingKey',
+    required: false,
+    description: 'Plex rating key for the media',
+    type: String,
+  })
+  @ApiQuery({
+    name: 'parentRatingKey',
+    required: false,
+    description: 'Plex parent rating key for the media',
+    type: String,
+  })
+  @ApiQuery({
+    name: 'grandparentRatingKey',
+    required: false,
+    description: 'Plex grandparent rating key for the media',
+    type: String,
+  })
   @Get('plex/thumbnail')
   async getPlexThumbnail(
     @Query('mediaType') mediaType: string,
@@ -112,6 +138,12 @@ export class FileStorageController {
     }
   }
 
+  @ApiParam({
+    name: 'id',
+    required: true,
+    description: 'ID of the file to retrieve',
+    type: String,
+  })
   @Get('id/:id')
   async getFileById(@Param('id') id: string, @Res() res: Response) {
     try {
@@ -142,6 +174,12 @@ export class FileStorageController {
     }
   }
 
+  @ApiParam({
+    name: 'filename',
+    required: true,
+    description: 'Filename of the file to retrieve',
+    type: String,
+  })
   @Get(':filename')
   async getFile(@Param('filename') filename: string, @Res() res: Response) {
     try {
@@ -172,6 +210,12 @@ export class FileStorageController {
     }
   }
 
+  @ApiParam({
+    name: 'id',
+    required: true,
+    description: 'ID of the file to retrieve info for',
+    type: String,
+  })
   @Get('info/id/:id')
   async getFileInfoById(@Param('id') id: string) {
     try {
@@ -198,6 +242,12 @@ export class FileStorageController {
     }
   }
 
+  @ApiParam({
+    name: 'filename',
+    required: true,
+    description: 'Filename of the file to retrieve info for',
+    type: String,
+  })
   @Get('info/:filename')
   async getFileInfo(@Param('filename') filename: string) {
     try {
@@ -224,6 +274,12 @@ export class FileStorageController {
     }
   }
 
+  @ApiParam({
+    name: 'id',
+    required: true,
+    description: 'ID of the file to delete',
+    type: String,
+  })
   @Delete(':id')
   async deleteFile(@Param('id') id: string) {
     try {
