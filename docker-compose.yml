@@ -21,7 +21,7 @@ services:
       - PORT=${PORT:-3001}
       - FILE_STORAGE_PATH=${FILE_STORAGE_PATH:-/app/storage}
     volumes:
-      - '${STORAGE_VOLUME_PATH:-Y:/FileStorage}:/app/storage'
+      - '${STORAGE_VOLUME_PATH:-D:/FileStorage}:/app/storage'
     restart: unless-stopped
     extra_hosts:
       - 'host.docker.internal:host-gateway'

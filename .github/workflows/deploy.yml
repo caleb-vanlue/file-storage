@@ -26,7 +26,7 @@ jobs:
           DB_USERNAME: ${{ secrets.DB_USERNAME }}
           DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
           DB_DATABASE: ${{ secrets.DB_DATABASE }}
-          STORAGE_VOLUME_PATH: 'Y:/FileStorage'
+          STORAGE_VOLUME_PATH: 'D:/FileStorage'
           NODE_ENV: production
         run: |
           @"
