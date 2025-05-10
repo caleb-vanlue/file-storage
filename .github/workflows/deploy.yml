@@ -1,8 +1,9 @@
-name: Deploy File Storage
+name: Deploy File Storage API
 
 on:
   push:
     branches: [main]
+  workflow_dispatch:
 
 jobs:
   deploy:
@@ -17,27 +18,7 @@ jobs:
         run: |
           docker-compose build file-storage
 
-      - name: Run database migrations
-        shell: powershell
-        env:
-          DB_HOST: host.docker.internal
-          DB_PORT: 5432
-          DB_USERNAME: ${{ secrets.DB_USERNAME }}
-          DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
-          DB_DATABASE: ${{ secrets.DB_DATABASE }}
-          NODE_ENV: production
-        run: |
-          docker-compose run --rm `
-            -e DB_HOST=$env:DB_HOST `
-            -e DB_PORT=$env:DB_PORT `
-            -e DB_USERNAME=$env:DB_USERNAME `
-            -e DB_PASSWORD=$env:DB_PASSWORD `
-            -e DB_DATABASE=$env:DB_DATABASE `
-            -e NODE_ENV=$env:NODE_ENV `
-            file-storage `
-            npm run migration:run
-
-      - name: Deploy services
+      - name: Deploy service
         shell: powershell
         env:
           DB_HOST: host.docker.internal
@@ -46,24 +27,32 @@ jobs:
           DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
           DB_DATABASE: ${{ secrets.DB_DATABASE }}
           STORAGE_VOLUME_PATH: 'Y:/FileStorage'
-          FILE_STORAGE_PATH: '/app/storage'
           NODE_ENV: production
-          PORT: 3001
         run: |
+          @"
+          DB_HOST=$env:DB_HOST
+          DB_PORT=$env:DB_PORT
+          DB_USERNAME=$env:DB_USERNAME
+          DB_PASSWORD=$env:DB_PASSWORD
+          DB_DATABASE=$env:DB_DATABASE
+          STORAGE_VOLUME_PATH=$env:STORAGE_VOLUME_PATH
+          NODE_ENV=$env:NODE_ENV
+          "@ | Out-File -Encoding utf8 .env
+
+          docker-compose run --rm file-storage npm run migration:run
+
           $containerExists = docker ps -a --filter "name=file-storage" --format "{{.Names}}"
           if ($containerExists) {
-            Write-Host "Stopping existing container"
-            docker-compose stop file-storage
-            docker-compose rm -f file-storage
-          } else {
-            Write-Host "Container doesn't exist, continuing..."
+            Write-Host "Stopping and removing existing container..."
+            docker stop file-storage
+            docker rm file-storage
           }
 
           docker-compose up -d file-storage
 
-          docker-compose ps
+          docker ps -f name=file-storage
 
       - name: Cleanup
         shell: powershell
         run: |
-          docker image prune -f
+          docker image prune -a --filter "until=72h" --force

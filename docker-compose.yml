@@ -5,11 +5,12 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
+      target: production
     container_name: file-storage
     ports:
       - '0.0.0.0:3001:3001'
     networks:
-      - host-network
+      - app-network
     environment:
       - DB_HOST=${DB_HOST:-host.docker.internal}
       - DB_PORT=${DB_PORT:-5432}
@@ -24,10 +25,9 @@ services:
     restart: unless-stopped
     extra_hosts:
       - 'host.docker.internal:host-gateway'
-    command: npm run start:prod
 
 networks:
-  host-network:
-    name: host-network
+  app-network:
+    name: app-network
     driver: bridge
     external: true
